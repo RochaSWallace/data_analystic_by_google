@@ -1,0 +1,137 @@
+#abertura das bibliotecas
+library(tidyverse)
+library(ggplot2)
+library(lubridate)
+#Lendo os arquivos
+ago_2022 <- read.csv("analise/202208-divvy-tripdata.csv")
+set_2022 <- read.csv("analise/202209-divvy-tripdata.csv")
+out_2022 <- read.csv("analise/202210-divvy-tripdata.csv")
+nov_2022 <- read.csv("analise/202211-divvy-tripdata.csv")
+dez_2023 <- read.csv("analise/202212-divvy-tripdata.csv")
+jan_2023 <- read.csv("analise/202301-divvy-tripdata.csv")
+fev_2023 <- read.csv("analise/202302-divvy-tripdata.csv")
+mar_2023 <- read.csv("analise/202303-divvy-tripdata.csv")
+abr_2023 <- read.csv("analise/202304-divvy-tripdata.csv")
+mai_2023 <- read.csv("analise/202305-divvy-tripdata.csv")
+jun_2023 <- read.csv("analise/202306-divvy-tripdata.csv")
+jul_2023 <- read.csv("analise/202307-divvy-tripdata.csv")
+#Unindo meus arquivos para trabalhar melhor
+last_year <- rbind(ago_2022, set_2022, out_2022, nov_2022, dez_2023, jan_2023, fev_2023, mar_2023, abr_2023, mai_2023, jun_2023, jul_2023)
+#mudar o tipo de dados de datas de string para POSIXct
+last_year <- last_year %>% 
+  mutate(started_at = as_datetime(started_at), 
+         ended_at = as_datetime(ended_at))
+#Criação de uma nova coluna com a duração da corrida
+last_year <- last_year %>% 
+  mutate(tour_duration = difftime(ended_at, started_at))
+#Criação de uma nova coluna com o dia da semana, sendo 1 - domingo e 7 - sabado      
+last_year <- last_year %>% 
+  mutate(day_of_week = wday(started_at))
+#fazendo alterações no nomes das colunas para maior compreenssão
+last_year <- last_year %>% rename(trip_id = ride_id,
+                                  bikeid= rideable_type,
+                                  start_time = started_at,
+                                  end_time = ended_at,
+                                  from_station_name = start_station_name,
+                                  from_station_id = start_station_id,
+                                  to_station_name = end_station_name,
+                                  to_station_id = end_station_id,
+                                  usertype = member_casual)
+#removendo colunas que não são usadas
+last_year <- last_year %>%  
+  subset(select = -c(start_lat, start_lng, end_lat, end_lng))
+#Visão dos dados
+colnames(last_year)  #List of column names
+nrow(last_year)  #How many rows are in data frame?
+dim(last_year)  #Dimensions of the data frame?
+head(last_year)  #See the first 6 rows of data frame.  Also tail(all_trips)
+str(last_year)  #See list of columns and data types (numeric, character, etc)
+summary(last_year)  #Statistical summary of data. Mainly for numerics
+#Criação de uma nova coluna com o mes e ano     
+last_year <- last_year %>% 
+  mutate(rent_month = month(start_time),
+         rent_year = year(start_time))
+#Retirando tempos de alugueis negativos ou iguais a zero, numero de linhas atuais: 5723606
+last_year <- subset(last_year, (tour_duration > 0))
+#Numero de linhas atuais: 5722891, totalizando a retirada de 715 linhas
+
+#Nenhuma linha com essa condição foi achada
+subset(last_year, from_station_name == "HQ QR")
+
+#Analise sobre o tempo de duração das corridas
+mean(last_year$tour_duration) #Duração média da corrida
+median(last_year$tour_duration) #tempo da moda
+max(last_year$tour_duration) #maior duração
+min(last_year$tour_duration) #menor duração
+
+#comparação entre membros e usuarios anuais
+aggregate(last_year$tour_duration ~ last_year$usertype, FUN = mean)
+aggregate(last_year$tour_duration ~ last_year$usertype, FUN = median)
+aggregate(last_year$tour_duration ~ last_year$usertype, FUN = max)
+aggregate(last_year$tour_duration ~ last_year$usertype, FUN = min)
+
+#tempo medio por dia em comparação do tipo de membros
+aggregate(last_year$tour_duration ~ last_year$usertype + last_year$day_of_week, FUN = mean)
+
+#Calculo da duração media de corrida, quantidade divididos por dias e tipo de socio
+last_year %>% 
+  group_by(usertype, day_of_week) %>%  
+  summarise(number_of_rides = n(),
+            average_duration = mean(tour_duration)) %>% 		
+  arrange(usertype, day_of_week)		
+
+last_year_2 <- read.csv("last_year_2")
+#Grafico para representar a função anterior
+last_year %>% 
+  group_by(usertype, day_of_week) %>% 
+  summarise(number_of_rides = n()) %>% 
+  arrange(usertype, day_of_week)  %>% 
+  ggplot(aes(x = day_of_week, y = number_of_rides, fill = usertype)) +
+  geom_col(position = "dodge")
+#Gráfico que mostra a relação entre o tempo medio das corridas em relação aos tidas da semana e os membros
+last_year %>% 
+  group_by(usertype, day_of_week) %>% 
+  summarise(average_duration = mean(tour_duration)) %>% 
+  arrange(usertype, day_of_week)  %>% 
+  ggplot(aes(x = day_of_week, y = average_duration, fill = usertype)) +
+  geom_col(position = "dodge") 
+
+
+#Gráfico de tipo de usuario
+ggplot(data=last_year) + geom_bar(mapping = aes(x = usertype))
+
+#Gráfico do tipo de bicicleta
+ggplot(data=last_year) + geom_bar(mapping = aes(x = rent_month), fill = "green") + facet_grid(~bikeid)
+
+write.table(last_year, file = "last_year_2.csv", sep = ",")
+
+savePlot("grafico_1.png", type = "png")
+
+ggsave("grafico_1.png", grafico_corrida_semana, width = 3, height = 3)
+
+teste <- slice(teste, -c(retirar))
+View(teste)
+
+#numero de corridas por mês
+last_year %>% 
+  group_by(usertype, rent_month) %>% 
+  summarise(number_of_rides = n()) %>% 
+  arrange(usertype, rent_month)  %>% 
+  ggplot(aes(x = rent_month, y = number_of_rides, fill = usertype)) +
+  geom_col(position = "dodge")
+#Gráfico que mostra a relação entre o tempo medio das corridas em relação aos tidas da semana e os membros
+last_year %>% 
+  group_by(usertype, rent_month) %>% 
+  summarise(average_duration = mean(tour_duration)) %>% 
+  arrange(usertype, rent_month)  %>% 
+  ggplot(aes(x = rent_month, y = average_duration, fill = usertype)) +
+  geom_col(position = "dodge")
+
+
+
+install.packages("rmarkdown")
+install.packages("knitr")
+install.packages("xaringan")
+library(rmarkdown)
+library(knitr)
+library(xaringan)
